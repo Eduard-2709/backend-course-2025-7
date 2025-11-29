@@ -8,7 +8,7 @@
     "dev": "nodemon app.js"
   },
   "keywords": [ "inventory", "express", "api" ],
-  "author": "Baune Ixi'x bc2025-6",
+  "author": "Едуард bc2025-6",
   "license": "ISC",
   "dependencies": {
     "commander": "^9.4.1",
