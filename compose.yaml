@@ -1,0 +1,45 @@
+version: '3.8'  # Версія синтаксису docker-compose
+
+services:
+  # Сервіс для нашого Node.js додатку
+  app:
+    build: .  # Збирає образ з Dockerfile в поточній директорії
+    ports:
+      - "3000:3000"  # Проброс портів: хост:контейнер
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=db  # Назва сервісу БД як hostname
+      - DB_PORT=5432
+      - DB_NAME=inventory_db
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - SERVER_HOST=0.0.0.0  # Слухає всі інтерфейси
+      - SERVER_PORT=3000
+      - CACHE_DIR=./uploads
+    volumes:
+      # Синхронізація коду між хостом і контейнером для hot reload
+      - .:/app
+      # Окремий том для node_modules (щоб не перезаписуватися)
+      - /app/node_modules
+    depends_on:
+      - db  # Запускати після БД
+    command: npm run dev  # Команда для запуску (заміняє CMD з Dockerfile)
+
+  # Сервіс для PostgreSQL бази даних
+  db:
+    image: postgres:15-alpine  # Використовує офіційний образ PostgreSQL
+    environment:
+      - POSTGRES_DB=inventory_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"  # Проброс порту БД для зовнішнього підключення
+    volumes:
+      # Постійне зберігання даних БД
+      - postgres_data:/var/lib/postgresql/data
+      # Скрипт ініціалізації БД (про нього далі)
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+
+# Визначення томів для зберігання даних
+volumes:
+  postgres_data:  # Ім'я тому для даних PostgreSQL
