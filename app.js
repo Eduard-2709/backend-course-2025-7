@@ -5,12 +5,23 @@ const fs = require('fs');
 const path = require('path');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const { Pool } = require('pg');
+require('dotenv').config();
+
+// Ініціалізація підключення до БД
+const pool = new Pool({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+});
 
 // Конфігурація Commander.js
 program
-    .requiredOption('-h, --host <host>', 'Server host')
-    .requiredOption('-p, --port <port>', 'Server port')
-    .requiredOption('-c, --cache <path>', 'Cache directory path')
+    .option('-h, --host <host>', 'Server host', process.env.SERVER_HOST || 'localhost')
+    .option('-p, --port <port>', 'Server port', process.env.SERVER_PORT || 3000)
+    .option('-c, --cache <path>', 'Cache directory path', process.env.CACHE_DIR || './uploads')
     .parse(process.argv);
 
 const options = program.opts();
@@ -58,40 +69,14 @@ const upload = multer({
     }
 });
 
-// Сховище даних (in memory) з тестовими даними
-let inventory = [
-    {
-        id: 1,
-        inventory_name: "Dell XPS 15 Laptop",
-        description: "Потужний ноутбук для розробки та дизайну",
-        photo_filename: null,
-        created_at: new Date().toISOString()
-    },
-    {
-        id: 2,
-        inventory_name: "iPhone 15 Pro",
-        description: "Флагманський смартфон для тестування мобільних додатків",
-        photo_filename: null,
-        created_at: new Date().toISOString()
-    },
-    {
-        id: 3,
-        inventory_name: "Samsung 4K Monitor",
-        description: "27-дюймовий 4K монітор для професійної роботи",
-        photo_filename: null,
-        created_at: new Date().toISOString()
-    }
-];
-let nextId = 4;
-
 // Swagger документація
 const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
         info: {
-            title: 'Inventory Service API',
+            title: 'Inventory Service API with Docker & PostgreSQL',
             version: '1.0.0',
-            description: 'API для системи інвентаризації - Лабораторна робота №6',
+            description: 'API для системи інвентаризації - Лабораторна робота №7',
             contact: {
                 name: "Student",
                 email: "student@example.com"
@@ -144,7 +129,7 @@ function getMimeType(filePath) {
     return mimeTypes[ext] || 'image/jpeg';
 }
 
-// HTML форми
+// HTML форми (залишаємо без змін)
 app.get('/RegisterForm.html', (req, res) => {
     const filePath = path.join(__dirname, 'RegisterForm.html');
     console.log(`📄 Serving RegisterForm.html`);
@@ -160,7 +145,9 @@ app.get('/SearchForm.html', (req, res) => {
 // Головна сторінка
 app.get('/', (req, res) => {
     res.json({
-        message: "Inventory Service API is running!",
+        message: "Inventory Service API with Docker & PostgreSQL is running!",
+        environment: process.env.NODE_ENV || 'development',
+        database: "PostgreSQL",
         endpoints: {
             documentation: "/docs",
             register_form: "/RegisterForm.html",
@@ -168,11 +155,11 @@ app.get('/', (req, res) => {
             register: "/register (POST)",
             inventory: "/inventory (GET)",
             search: "/search (POST)"
-        },
-        test_data: "Available item IDs: 1, 2, 3"
+        }
     });
 });
 
+// Swagger схеми (залишаємо без змін)
 /**
  * @swagger
  * components:
@@ -257,7 +244,7 @@ app.get('/', (req, res) => {
  *       500:
  *         description: Внутрішня помилка сервера
  */
-app.post('/register', upload.single('photo'), (req, res) => {
+app.post('/register', upload.single('photo'), async (req, res) => {
     try {
         console.log('📝 Registration request received');
         console.log('📦 Request body:', req.body);
@@ -270,15 +257,12 @@ app.post('/register', upload.single('photo'), (req, res) => {
             return res.status(400).json({ error: 'Inventory name is required' });
         }
 
-        const newItem = {
-            id: nextId++,
-            inventory_name,
-            description: description || '',
-            photo_filename: req.file ? req.file.filename : null,
-            created_at: new Date().toISOString()
-        };
+        const result = await pool.query(
+            'INSERT INTO inventory (inventory_name, description, photo_filename) VALUES ($1, $2, $3) RETURNING *',
+            [inventory_name, description || '', req.file ? req.file.filename : null]
+        );
 
-        inventory.push(newItem);
+        const newItem = result.rows[0];
 
         console.log('✅ New item registered successfully:', {
             id: newItem.id,
@@ -316,19 +300,25 @@ app.post('/register', upload.single('photo'), (req, res) => {
  *               items:
  *                 $ref: '#/components/schemas/Inventory'
  */
-app.get('/inventory', (req, res) => {
-    console.log(`📋 Inventory list request - ${inventory.length} items total`);
+app.get('/inventory', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM inventory ORDER BY id');
+        console.log(`📋 Inventory list request - ${result.rows.length} items total`);
 
-    const inventoryWithUrls = inventory.map(item => ({
-        id: item.id,
-        inventory_name: item.inventory_name,
-        description: item.description,
-        photo_url: item.photo_filename ? `/inventory/${item.id}/photo` : null,
-        created_at: item.created_at
-    }));
+        const inventoryWithUrls = result.rows.map(item => ({
+            id: item.id,
+            inventory_name: item.inventory_name,
+            description: item.description,
+            photo_url: item.photo_filename ? `/inventory/${item.id}/photo` : null,
+            created_at: item.created_at
+        }));
 
-    console.log(`✅ Sending ${inventoryWithUrls.length} items`);
-    res.status(200).json(inventoryWithUrls);
+        console.log(`✅ Sending ${inventoryWithUrls.length} items`);
+        res.status(200).json(inventoryWithUrls);
+    } catch (error) {
+        console.error('💥 Error fetching inventory:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 /**
@@ -358,27 +348,33 @@ app.get('/inventory', (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.get('/inventory/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    console.log(`🔍 Get item request - ID: ${id}`);
+app.get('/inventory/:id', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        console.log(`🔍 Get item request - ID: ${id}`);
 
-    const item = inventory.find(item => item.id === id);
+        const result = await pool.query('SELECT * FROM inventory WHERE id = $1', [id]);
 
-    if (!item) {
-        console.log(`❌ Item ${id} not found. Available IDs: ${inventory.map(i => i.id).join(', ')}`);
-        return res.status(404).json({ error: `Item with ID ${id} not found` });
+        if (result.rows.length === 0) {
+            console.log(`❌ Item ${id} not found.`);
+            return res.status(404).json({ error: `Item with ID ${id} not found` });
+        }
+
+        const item = result.rows[0];
+        const itemWithUrl = {
+            id: item.id,
+            inventory_name: item.inventory_name,
+            description: item.description,
+            photo_url: item.photo_filename ? `/inventory/${item.id}/photo` : null,
+            created_at: item.created_at
+        };
+
+        console.log(`✅ Item found: ${item.inventory_name}`);
+        res.status(200).json(itemWithUrl);
+    } catch (error) {
+        console.error('💥 Error fetching item:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-    const itemWithUrl = {
-        id: item.id,
-        inventory_name: item.inventory_name,
-        description: item.description,
-        photo_url: item.photo_filename ? `/inventory/${item.id}/photo` : null,
-        created_at: item.created_at
-    };
-
-    console.log(`✅ Item found: ${item.inventory_name}`);
-    res.status(200).json(itemWithUrl);
 });
 
 /**
@@ -404,22 +400,28 @@ app.get('/inventory/:id', (req, res) => {
  *       404:
  *         description: Фото або інвентар не знайдено
  */
-app.get('/inventory/:id/photo', (req, res) => {
-    const id = parseInt(req.params.id);
-    const item = inventory.find(item => item.id === id);
+app.get('/inventory/:id/photo', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const result = await pool.query('SELECT * FROM inventory WHERE id = $1', [id]);
 
-    if (!item || !item.photo_filename) {
-        return res.status(404).json({ error: 'Photo not found' });
+        if (result.rows.length === 0 || !result.rows[0].photo_filename) {
+            return res.status(404).json({ error: 'Photo not found' });
+        }
+
+        const item = result.rows[0];
+        const photoPath = path.join(__dirname, options.cache, item.photo_filename);
+
+        if (!fs.existsSync(photoPath)) {
+            return res.status(404).json({ error: 'Photo file not found' });
+        }
+
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.sendFile(photoPath);
+    } catch (error) {
+        console.error('💥 Error fetching photo:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-    const photoPath = path.join(__dirname, options.cache, item.photo_filename);
-
-    if (!fs.existsSync(photoPath)) {
-        return res.status(404).json({ error: 'Photo file not found' });
-    }
-
-    res.setHeader('Content-Type', 'image/jpeg');
-    res.sendFile(photoPath);
 });
 
 /**
@@ -427,6 +429,7 @@ app.get('/inventory/:id/photo', (req, res) => {
  * /inventory/{id}/photo:
  *   put:
  *     summary: Оновити фото зображення конкретної речі
+ *     tags: [Inventory]
  *     parameters:
  *       - in: path
  *         name: id
@@ -450,28 +453,41 @@ app.get('/inventory/:id/photo', (req, res) => {
  *       404:
  *         description: Інвентар не знайдено
  */
-app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
-    const id = parseInt(req.params.id);
-    const item = inventory.find(item => item.id === id);
+app.put('/inventory/:id/photo', upload.single('photo'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
 
-    if (!item) {
-        return res.status(404).json({ error: 'Item not found' });
-    }
-
-    if (!req.file) {
-        return res.status(400).json({ error: 'Photo is required' });
-    }
-
-    // Видаляємо старе фото якщо воно існує
-    if (item.photo_filename) {
-        const oldPhotoPath = path.join(__dirname, options.cache, item.photo_filename);
-        if (fs.existsSync(oldPhotoPath)) {
-            fs.unlinkSync(oldPhotoPath);
+        // Перевіряємо існування елемента
+        const checkResult = await pool.query('SELECT * FROM inventory WHERE id = $1', [id]);
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Item not found' });
         }
-    }
 
-    item.photo_filename = req.file.filename;
-    res.status(200).json({ message: 'Photo updated successfully' });
+        const item = checkResult.rows[0];
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'Photo is required' });
+        }
+
+        // Видаляємо старе фото якщо воно існує
+        if (item.photo_filename) {
+            const oldPhotoPath = path.join(options.cache, item.photo_filename);
+            if (fs.existsSync(oldPhotoPath)) {
+                fs.unlinkSync(oldPhotoPath);
+            }
+        }
+
+        // Оновлюємо запис в БД
+        await pool.query(
+            'UPDATE inventory SET photo_filename = $1 WHERE id = $2',
+            [req.file.filename, id]
+        );
+
+        res.status(200).json({ message: 'Photo updated successfully' });
+    } catch (error) {
+        console.error('💥 Error updating photo:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 /**
@@ -504,81 +520,57 @@ app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
  *       404:
  *         description: Інвентар не знайдено
  */
-app.put('/inventory/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    const item = inventory.find(item => item.id === id);
+app.put('/inventory/:id', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const { inventory_name, description } = req.body;
 
-    if (!item) {
-        return res.status(404).json({ error: 'Item not found' });
-    }
-
-    const { inventory_name, description } = req.body;
-
-    if (inventory_name) item.inventory_name = inventory_name;
-    if (description !== undefined) item.description = description;
-
-    res.status(200).json({
-        message: 'Item updated successfully',
-        item: {
-            id: item.id,
-            inventory_name: item.inventory_name,
-            description: item.description,
-            photo_url: item.photo_filename ? `/inventory/${item.id}/photo` : null
+        // Перевіряємо існування елемента
+        const checkResult = await pool.query('SELECT * FROM inventory WHERE id = $1', [id]);
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Item not found' });
         }
-    });
-});
 
-/**
- * @swagger
- * /inventory/{id}/photo:
- *   put:
- *     summary: Оновити фото зображення конкретної речі
- *     tags: [Inventory]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID інвентаря
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               photo:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Фото оновлено
- *       404:
- *         description: Інвентар не знайдено
- */
-app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
-    const id = parseInt(req.params.id);
-    const item = inventory.find(item => item.id === id);
+        // Оновлюємо поля
+        const updateFields = [];
+        const updateValues = [];
+        let paramCount = 1;
 
-    if (!item) {
-        return res.status(404).json({ error: 'Item not found' });
-    }
-
-    if (!req.file) {
-        return res.status(400).json({ error: 'Photo is required' });
-    }
-
-    // Видаляємо старе фото якщо воно існує
-    if (item.photo_filename) {
-        const oldPhotoPath = path.join(options.cache, item.photo_filename);
-        if (fs.existsSync(oldPhotoPath)) {
-            fs.unlinkSync(oldPhotoPath);
+        if (inventory_name) {
+            updateFields.push(`inventory_name = $${paramCount}`);
+            updateValues.push(inventory_name);
+            paramCount++;
         }
-    }
 
-    item.photo_filename = req.file.filename;
-    res.status(200).json({ message: 'Photo updated successfully' });
+        if (description !== undefined) {
+            updateFields.push(`description = $${paramCount}`);
+            updateValues.push(description);
+            paramCount++;
+        }
+
+        if (updateFields.length === 0) {
+            return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        updateValues.push(id);
+        const query = `UPDATE inventory SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+
+        const result = await pool.query(query, updateValues);
+        const updatedItem = result.rows[0];
+
+        res.status(200).json({
+            message: 'Item updated successfully',
+            item: {
+                id: updatedItem.id,
+                inventory_name: updatedItem.inventory_name,
+                description: updatedItem.description,
+                photo_url: updatedItem.photo_filename ? `/inventory/${updatedItem.id}/photo` : null
+            }
+        });
+    } catch (error) {
+        console.error('💥 Error updating item:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 /**
@@ -600,27 +592,34 @@ app.put('/inventory/:id/photo', upload.single('photo'), (req, res) => {
  *       404:
  *         description: Інвентар не знайдено
  */
+app.delete('/inventory/:id', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
 
-app.delete('/inventory/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    const itemIndex = inventory.findIndex(item => item.id === id);
-
-    if (itemIndex === -1) {
-        return res.status(404).json({ error: 'Item not found' });
-    }
-
-    const item = inventory[itemIndex];
-
-    // Видаляємо фото якщо воно існує
-    if (item.photo_filename) {
-        const photoPath = path.join(options.cache, item.photo_filename);
-        if (fs.existsSync(photoPath)) {
-            fs.unlinkSync(photoPath);
+        // Отримуємо інформацію про елемент перед видаленням
+        const result = await pool.query('SELECT * FROM inventory WHERE id = $1', [id]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Item not found' });
         }
-    }
 
-    inventory.splice(itemIndex, 1);
-    res.status(200).json({ message: 'Item deleted successfully' });
+        const item = result.rows[0];
+
+        // Видаляємо фото якщо воно існує
+        if (item.photo_filename) {
+            const photoPath = path.join(options.cache, item.photo_filename);
+            if (fs.existsSync(photoPath)) {
+                fs.unlinkSync(photoPath);
+            }
+        }
+
+        // Видаляємо запис з БД
+        await pool.query('DELETE FROM inventory WHERE id = $1', [id]);
+
+        res.status(200).json({ message: 'Item deleted successfully' });
+    } catch (error) {
+        console.error('💥 Error deleting item:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 /**
@@ -660,81 +659,101 @@ app.delete('/inventory/:id', (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-app.post('/search', (req, res) => {
-    console.log('🔍 Search request received:', req.body);
+app.post('/search', async (req, res) => {
+    try {
+        console.log('🔍 Search request received:', req.body);
 
-    const { id, includePhoto } = req.body;
-    const itemId = parseInt(id);
+        const { id, includePhoto } = req.body;
+        const itemId = parseInt(id);
 
-    console.log(`🔎 Searching for item ID: ${itemId}`);
-    console.log(`📦 Available items: ${inventory.map(item => `ID ${item.id}: "${item.inventory_name}"`).join(', ')}`);
+        console.log(`🔎 Searching for item ID: ${itemId}`);
 
-    const item = inventory.find(item => item.id === itemId);
+        const result = await pool.query('SELECT * FROM inventory WHERE id = $1', [itemId]);
 
-    if (!item) {
-        console.log(`❌ SEARCH FAILED: Item ${itemId} not found!`);
-        console.log(`📋 Available IDs: ${inventory.map(i => i.id).join(', ')}`);
-        return res.status(404).json({ error: `Item with ID ${itemId} not found` });
+        if (result.rows.length === 0) {
+            console.log(`❌ SEARCH FAILED: Item ${itemId} not found!`);
+            return res.status(404).json({ error: `Item with ID ${itemId} not found` });
+        }
+
+        const item = result.rows[0];
+        let responseItem = {
+            id: item.id,
+            inventory_name: item.inventory_name,
+            description: item.description,
+            photo_url: item.photo_filename ? `/inventory/${item.id}/photo` : null,
+            created_at: item.created_at
+        };
+
+        if (includePhoto && item.photo_filename) {
+            responseItem.description += ` [Photo: /inventory/${item.id}/photo]`;
+            console.log(`📷 Photo included in description for item ${itemId}`);
+        }
+
+        console.log(`✅ SEARCH SUCCESS: Found "${item.inventory_name}" (ID: ${item.id})`);
+        res.status(200).json(responseItem);
+    } catch (error) {
+        console.error('💥 Search error:', error);
+        res.status(500).json({ error: 'Internal server error' });
     }
-
-    let responseItem = {
-        id: item.id,
-        inventory_name: item.inventory_name,
-        description: item.description,
-        photo_url: item.photo_filename ? `/inventory/${item.id}/photo` : null,
-        created_at: item.created_at
-    };
-
-    if (includePhoto && item.photo_filename) {
-        responseItem.description += ` [Photo: /inventory/${item.id}/photo]`;
-        console.log(`📷 Photo included in description for item ${itemId}`);
-    }
-
-    console.log(`✅ SEARCH SUCCESS: Found "${item.inventory_name}" (ID: ${item.id})`);
-    res.status(200).json(responseItem);
 });
 
 // Додатковий endpoint для отримання статистики
-app.get('/stats', (req, res) => {
-    const stats = {
-        total_items: inventory.length,
-        items_with_photos: inventory.filter(item => item.photo_filename).length,
-        available_ids: inventory.map(item => item.id),
-        server_uptime: process.uptime(),
-        cache_directory: options.cache
-    };
-    res.json(stats);
+app.get('/stats', async (req, res) => {
+    try {
+        const totalResult = await pool.query('SELECT COUNT(*) FROM inventory');
+        const photosResult = await pool.query('SELECT COUNT(*) FROM inventory WHERE photo_filename IS NOT NULL');
+        const idsResult = await pool.query('SELECT id FROM inventory');
+
+        const stats = {
+            total_items: parseInt(totalResult.rows[0].count),
+            items_with_photos: parseInt(photosResult.rows[0].count),
+            available_ids: idsResult.rows.map(row => row.id),
+            server_uptime: process.uptime(),
+            cache_directory: options.cache,
+            database: "PostgreSQL"
+        };
+        res.json(stats);
+    } catch (error) {
+        console.error('💥 Stats error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Додатковий endpoint для перевірки стану фото
-app.get('/inventory/:id/photo-info', (req, res) => {
-    const id = parseInt(req.params.id);
-    const item = inventory.find(item => item.id === id);
+app.get('/inventory/:id/photo-info', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const result = await pool.query('SELECT * FROM inventory WHERE id = $1', [id]);
 
-    if (!item) {
-        return res.status(404).json({ error: 'Item not found' });
-    }
-
-    const photoInfo = {
-        item_id: item.id,
-        item_name: item.inventory_name,
-        photo_filename: item.photo_filename,
-        has_photo: !!item.photo_filename
-    };
-
-    if (item.photo_filename) {
-        const photoPath = path.join(options.cache, item.photo_filename);
-        photoInfo.file_exists = fs.existsSync(photoPath);
-
-        if (photoInfo.file_exists) {
-            const stats = fs.statSync(photoPath);
-            photoInfo.file_size = stats.size;
-            photoInfo.file_path = photoPath;
-            photoInfo.mime_type = getMimeType(photoPath);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Item not found' });
         }
-    }
 
-    res.json(photoInfo);
+        const item = result.rows[0];
+        const photoInfo = {
+            item_id: item.id,
+            item_name: item.inventory_name,
+            photo_filename: item.photo_filename,
+            has_photo: !!item.photo_filename
+        };
+
+        if (item.photo_filename) {
+            const photoPath = path.join(options.cache, item.photo_filename);
+            photoInfo.file_exists = fs.existsSync(photoPath);
+
+            if (photoInfo.file_exists) {
+                const stats = fs.statSync(photoPath);
+                photoInfo.file_size = stats.size;
+                photoInfo.file_path = photoPath;
+                photoInfo.mime_type = getMimeType(photoPath);
+            }
+        }
+
+        res.json(photoInfo);
+    } catch (error) {
+        console.error('💥 Photo info error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
 });
 
 // Обробка недозволених методів
@@ -758,7 +777,7 @@ app.use((err, req, res, next) => {
 // Запуск сервера
 app.listen(options.port, options.host, () => {
     console.log(`\n🚀 ==========================================`);
-    console.log(`🚀 Inventory Service API Started Successfully!`);
+    console.log(`🚀 Inventory Service with Docker & PostgreSQL`);
     console.log(`🚀 ==========================================`);
     console.log(`✅ Server running at http://${options.host}:${options.port}`);
     console.log(`📚 Swagger documentation: http://${options.host}:${options.port}/docs`);
@@ -767,12 +786,7 @@ app.listen(options.port, options.host, () => {
     console.log(`📋 Inventory list: http://${options.host}:${options.port}/inventory`);
     console.log(`📊 Stats: http://${options.host}:${options.port}/stats`);
     console.log(`📁 Cache directory: ${path.resolve(options.cache)}`);
-    console.log(`\n🎯 TEST DATA AVAILABLE:`);
-    console.log(`   Items with IDs: ${inventory.map(item => item.id).join(', ')}`);
-    console.log(`   Try: POST /search with id=1 and includePhoto=on`);
-    console.log(`\n💡 TROUBLESHOOTING:`);
-    console.log(`   If search fails, check available IDs at /inventory`);
-    console.log(`   Check photo info: GET /inventory/{id}/photo-info`);
-    console.log(`   Check console logs for detailed information`);
+    console.log(`🗄️  Database: PostgreSQL`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`==========================================\n`);
 });
