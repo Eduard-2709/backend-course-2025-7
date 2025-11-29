@@ -1,37 +1,54 @@
 {
 	"info": {
-		"_postman_id": "9c1266fb-60fa-44ab-befa-6cbdc7368868",
-		"name": "laba_6",
+		"_postman_id": "4a09c3fc-568f-4092-a12c-b165ecafb4c6",
+		"name": "laba_7_web",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "50104952",
-		"_collection_link": "https://eduardcer2709-80287.postman.co/workspace/c592e72b-52bd-4539-88d0-f6fed06f4dc0/collection/50104952-9c1266fb-60fa-44ab-befa-6cbdc7368868?action=share&source=collection_link&creator=50104952"
+		"_collection_link": "https://web.postman.co/workspace/Student's-Workspace~c592e72b-52bd-4539-88d0-f6fed06f4dc0/collection/50104952-4a09c3fc-568f-4092-a12c-b165ecafb4c6?action=share&source=collection_link&creator=50104952"
 	},
 	"item": [
 		{
-			"name": "http://localhost:3000/register",
+			"name": "Get_inventory",
 			"request": {
-				"auth": {
-					"type": "noauth"
-				},
-				"method": "POST",
+				"method": "GET",
 				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/inventory",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"inventory"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Post_register(без фото)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "multipart/form-data",
+						"type": "text"
+					}
+				],
 				"body": {
 					"mode": "formdata",
 					"formdata": [
 						{
 							"key": "inventory_name",
-							"value": "Python_Django",
+							"value": "Test Device from Postman",
 							"type": "text"
 						},
 						{
 							"key": "description",
-							"value": "Python",
+							"value": "This is a test device added via Postman",
 							"type": "text"
-						},
-						{
-							"key": "photo",
-							"type": "file",
-							"src": []
 						}
 					]
 				},
@@ -50,33 +67,53 @@
 			"response": []
 		},
 		{
-			"name": "http://localhost:3000/inventory",
+			"name": "Post_register(з фото)",
 			"request": {
-				"auth": {
-					"type": "noauth"
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "multipart/form-data",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "inventory_name",
+							"value": "Python_Django",
+							"type": "text"
+						},
+						{
+							"key": "description",
+							"value": "Python",
+							"type": "text"
+						},
+						{
+							"key": "photo",
+							"type": "file",
+							"src": "mftiInFZe/django.png"
+						}
+					]
 				},
-				"method": "GET",
-				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/inventory",
+					"raw": "http://localhost:3000/register",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"inventory"
+						"register"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "http://localhost:3000/inventory/1",
+			"name": "Get_inventory_id",
 			"request": {
-				"auth": {
-					"type": "noauth"
-				},
 				"method": "GET",
 				"header": [],
 				"url": {
@@ -95,11 +132,29 @@
 			"response": []
 		},
 		{
-			"name": "http://localhost:3000/inventory/1",
+			"name": "Get_inventory_id_photo",
 			"request": {
-				"auth": {
-					"type": "noauth"
-				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/inventory/5/photo",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"inventory",
+						"5",
+						"photo"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Put_invertory_id",
+			"request": {
 				"method": "PUT",
 				"header": [
 					{
@@ -110,7 +165,7 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n  \"inventory_name\": \"Updated Laptop\",\r\n  \"description\": \"Оновлений опис ноутбука\"\r\n}",
+					"raw": "{\r\n  \"inventory_name\": \"Updated Dell XPS 15\",\r\n  \"description\": \"Оновлений опис ноутбука для розробки\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -133,49 +188,28 @@
 			"response": []
 		},
 		{
-			"name": "http://localhost:3000/inventory/1/photo",
+			"name": "Put_invertory_id_photo",
 			"request": {
-				"auth": {
-					"type": "noauth"
-				},
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://localhost:3000/inventory/5/photo",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "3000",
-					"path": [
-						"inventory",
-						"5",
-						"photo"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "http://localhost:3000/inventory/4/photo",
-			"request": {
-				"auth": {
-					"type": "noauth"
-				},
 				"method": "PUT",
-				"header": [],
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "multipart/form-data",
+						"type": "text"
+					}
+				],
 				"body": {
 					"mode": "formdata",
 					"formdata": [
 						{
 							"key": "photo",
 							"type": "file",
-							"src": "SAMyb4nam/pythom-data-science.jpg"
+							"src": "pcv9JbiMn/django.png"
 						}
 					]
 				},
 				"url": {
-					"raw": "http://localhost:3000/inventory/4/photo",
+					"raw": "http://localhost:3000/inventory/1/photo",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -183,7 +217,7 @@
 					"port": "3000",
 					"path": [
 						"inventory",
-						"4",
+						"1",
 						"photo"
 					]
 				}
@@ -191,15 +225,12 @@
 			"response": []
 		},
 		{
-			"name": "http://localhost:3000/inventory/1",
+			"name": "Delete_invertory_id",
 			"request": {
-				"auth": {
-					"type": "noauth"
-				},
 				"method": "DELETE",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/inventory/1",
+					"raw": "http://localhost:3000/inventory/4",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -207,18 +238,15 @@
 					"port": "3000",
 					"path": [
 						"inventory",
-						"1"
+						"4"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "http://localhost:3000/search",
+			"name": "Post_search",
 			"request": {
-				"auth": {
-					"type": "noauth"
-				},
 				"method": "POST",
 				"header": [
 					{
@@ -232,12 +260,12 @@
 					"urlencoded": [
 						{
 							"key": "id",
-							"value": "1",
+							"value": "2",
 							"type": "text"
 						},
 						{
 							"key": "includePhoto",
-							"value": "on",
+							"value": "false",
 							"type": "text"
 						}
 					]
@@ -257,210 +285,93 @@
 			"response": []
 		},
 		{
-			"name": "http://localhost:3000/RegisterForm.html",
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript",
-						"packages": {},
-						"requests": {}
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript",
-						"packages": {},
-						"requests": {}
-					}
-				}
-			],
-			"protocolProfileBehavior": {
-				"disableBodyPruning": true
-			},
+			"name": "Get_stats",
 			"request": {
-				"auth": {
-					"type": "noauth"
-				},
 				"method": "GET",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/x-www-form-urlencoded",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "urlencoded",
-					"urlencoded": [
-						{
-							"key": "id",
-							"value": "1",
-							"type": "text"
-						},
-						{
-							"key": "includePhoto",
-							"value": "on",
-							"type": "text"
-						}
-					]
-				},
+				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/RegisterForm.html",
+					"raw": "http://localhost:3000/stats",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"RegisterForm.html"
+						"stats"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "http://localhost:3000/SearchForm.html",
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript",
-						"packages": {},
-						"requests": {}
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript",
-						"packages": {},
-						"requests": {}
-					}
-				}
-			],
-			"protocolProfileBehavior": {
-				"disableBodyPruning": true
-			},
+			"name": "Обробка помилок (не існуючий id)",
 			"request": {
-				"auth": {
-					"type": "noauth"
-				},
 				"method": "GET",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/x-www-form-urlencoded",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "urlencoded",
-					"urlencoded": [
-						{
-							"key": "id",
-							"value": "1",
-							"type": "text"
-						},
-						{
-							"key": "includePhoto",
-							"value": "on",
-							"type": "text"
-						}
-					]
-				},
+				"header": [],
 				"url": {
-					"raw": "http://localhost:3000/SearchForm.html",
+					"raw": "http://localhost:3000/inventory/999",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"SearchForm.html"
+						"inventory",
+						"999"
 					]
 				}
 			},
 			"response": []
 		},
 		{
-			"name": "http://localhost:3000/docs",
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript",
-						"packages": {},
-						"requests": {}
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							""
-						],
-						"type": "text/javascript",
-						"packages": {},
-						"requests": {}
-					}
-				}
-			],
-			"protocolProfileBehavior": {
-				"disableBodyPruning": true
-			},
+			"name": "post_register (Без обов'язкового поля)",
 			"request": {
-				"auth": {
-					"type": "noauth"
-				},
-				"method": "GET",
+				"method": "POST",
 				"header": [
 					{
 						"key": "Content-Type",
-						"value": "application/x-www-form-urlencoded",
+						"value": "multipart/form-data",
 						"type": "text"
 					}
 				],
 				"body": {
-					"mode": "urlencoded",
-					"urlencoded": [
+					"mode": "formdata",
+					"formdata": [
 						{
-							"key": "id",
-							"value": "1",
-							"type": "text"
-						},
-						{
-							"key": "includePhoto",
-							"value": "on",
+							"key": "description",
+							"value": "Missing required field",
 							"type": "text"
 						}
 					]
 				},
 				"url": {
-					"raw": "http://localhost:3000/docs",
+					"raw": "http://localhost:3000/register",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "3000",
 					"path": [
-						"docs"
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get (метод не найдений)",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"1"
 					]
 				}
 			},
