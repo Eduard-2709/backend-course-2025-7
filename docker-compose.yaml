@@ -1,5 +1,3 @@
-#version: '3.8'  # Версія синтаксису docker-compose
-
 services:
   # Сервіс для нашого Node.js додатку
   app:
