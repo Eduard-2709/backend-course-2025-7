@@ -39,8 +39,11 @@ app.use(express.urlencoded({ extended: true }));
 // CORS для коректної роботи з браузером
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
     next();
 });
 
@@ -69,7 +72,7 @@ const upload = multer({
     }
 });
 
-// Swagger документація
+// Swagger документація - ВИПРАВЛЕНА КОНФІГУРАЦІЯ
 const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
@@ -87,13 +90,88 @@ const swaggerOptions = {
                 url: `http://${options.host}:${options.port}`,
                 description: 'Development server'
             }
-        ]
+        ],
+        components: {
+            schemas: {
+                Inventory: {
+                    type: 'object',
+                    required: ['id', 'inventory_name'],
+                    properties: {
+                        id: {
+                            type: 'integer',
+                            description: 'Унікальний ідентифікатор'
+                        },
+                        inventory_name: {
+                            type: 'string',
+                            description: 'Назва інвентаря'
+                        },
+                        description: {
+                            type: 'string',
+                            description: 'Опис інвентаря'
+                        },
+                        photo_url: {
+                            type: 'string',
+                            description: 'URL фото'
+                        },
+                        created_at: {
+                            type: 'string',
+                            format: 'date-time',
+                            description: 'Дата створення'
+                        }
+                    }
+                },
+                Error: {
+                    type: 'object',
+                    properties: {
+                        error: {
+                            type: 'string',
+                            description: 'Повідомлення про помилку'
+                        }
+                    }
+                }
+            },
+            requestBodies: {
+                RegisterRequest: {
+                    type: 'object',
+                    required: ['inventory_name'],
+                    properties: {
+                        inventory_name: {
+                            type: 'string',
+                            example: 'MacBook Pro'
+                        },
+                        description: {
+                            type: 'string',
+                            example: 'Ноутбук для розробки'
+                        },
+                        photo: {
+                            type: 'string',
+                            format: 'binary'
+                        }
+                    }
+                }
+            }
+        }
     },
     apis: ['./app.js']
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// Виправлена конфігурація Swagger UI
+app.use('/docs', swaggerUi.serve, (req, res, next) => {
+    const swaggerUiHandler = swaggerUi.setup(swaggerSpec, {
+        swaggerOptions: {
+            supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+            validatorUrl: null,
+            displayRequestDuration: true,
+            docExpansion: 'none',
+            tryItOutEnabled: true
+        },
+        customCss: '.swagger-ui .topbar { display: none }',
+        customSiteTitle: "Inventory API Documentation"
+    });
+    swaggerUiHandler(req, res, next);
+});
 
 // Обробка помилок Multer
 app.use((error, req, res, next) => {
@@ -110,7 +188,7 @@ app.use((error, req, res, next) => {
 
 // Middleware для логування запитів
 app.use((req, res, next) => {
-    console.log(`📨 ${req.method} ${req.path} | Body:`, req.body);
+    console.log(`📨 ${req.method} ${req.path} | Content-Type: ${req.get('Content-Type')}`);
     next();
 });
 
@@ -129,7 +207,7 @@ function getMimeType(filePath) {
     return mimeTypes[ext] || 'image/jpeg';
 }
 
-// HTML форми (залишаємо без змін)
+// HTML форми
 app.get('/RegisterForm.html', (req, res) => {
     const filePath = path.join(__dirname, 'RegisterForm.html');
     console.log(`📄 Serving RegisterForm.html`);
@@ -159,46 +237,12 @@ app.get('/', (req, res) => {
     });
 });
 
-// Swagger схеми (залишаємо без змін)
-/**
- * @swagger
- * components:
- *   schemas:
- *     Inventory:
- *       type: object
- *       required:
- *         - id
- *         - inventory_name
- *       properties:
- *         id:
- *           type: integer
- *           description: Унікальний ідентифікатор
- *         inventory_name:
- *           type: string
- *           description: Назва інвентаря
- *         description:
- *           type: string
- *           description: Опис інвентаря
- *         photo_url:
- *           type: string
- *           description: URL фото
- *         created_at:
- *           type: string
- *           format: date-time
- *           description: Дата створення
- *     Error:
- *       type: object
- *       properties:
- *         error:
- *           type: string
- *           description: Повідомлення про помилку
- */
-
 /**
  * @swagger
  * /register:
  *   post:
  *     summary: Реєстрація нового пристрою
+ *     description: Додає новий інвентарний предмет з можливістю завантаження фото
  *     tags: [Inventory]
  *     requestBody:
  *       required: true
@@ -231,8 +275,10 @@ app.get('/', (req, res) => {
  *               properties:
  *                 message:
  *                   type: string
+ *                   example: "Device registered successfully"
  *                 id:
  *                   type: integer
+ *                   example: 4
  *                 item:
  *                   $ref: '#/components/schemas/Inventory'
  *       400:
@@ -249,6 +295,7 @@ app.post('/register', upload.single('photo'), async (req, res) => {
         console.log('📝 Registration request received');
         console.log('📦 Request body:', req.body);
         console.log('📷 File:', req.file);
+        console.log('📋 Headers:', req.headers);
 
         const { inventory_name, description } = req.body;
 
@@ -382,6 +429,7 @@ app.get('/inventory/:id', async (req, res) => {
  * /inventory/{id}/photo:
  *   get:
  *     summary: Отримати фото зображення конкретної речі
+ *     tags: [Inventory]
  *     parameters:
  *       - in: path
  *         name: id
@@ -393,7 +441,7 @@ app.get('/inventory/:id', async (req, res) => {
  *       200:
  *         description: Фото інвентаря
  *         content:
- *           image/jpeg:
+ *           image/*:
  *             schema:
  *               type: string
  *               format: binary
@@ -416,76 +464,11 @@ app.get('/inventory/:id/photo', async (req, res) => {
             return res.status(404).json({ error: 'Photo file not found' });
         }
 
-        res.setHeader('Content-Type', 'image/jpeg');
+        const mimeType = getMimeType(photoPath);
+        res.setHeader('Content-Type', mimeType);
         res.sendFile(photoPath);
     } catch (error) {
         console.error('💥 Error fetching photo:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-/**
- * @swagger
- * /inventory/{id}/photo:
- *   put:
- *     summary: Оновити фото зображення конкретної речі
- *     tags: [Inventory]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID інвентаря
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               photo:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Фото оновлено
- *       404:
- *         description: Інвентар не знайдено
- */
-app.put('/inventory/:id/photo', upload.single('photo'), async (req, res) => {
-    try {
-        const id = parseInt(req.params.id);
-
-        // Перевіряємо існування елемента
-        const checkResult = await pool.query('SELECT * FROM inventory WHERE id = $1', [id]);
-        if (checkResult.rows.length === 0) {
-            return res.status(404).json({ error: 'Item not found' });
-        }
-
-        const item = checkResult.rows[0];
-
-        if (!req.file) {
-            return res.status(400).json({ error: 'Photo is required' });
-        }
-
-        // Видаляємо старе фото якщо воно існує
-        if (item.photo_filename) {
-            const oldPhotoPath = path.join(options.cache, item.photo_filename);
-            if (fs.existsSync(oldPhotoPath)) {
-                fs.unlinkSync(oldPhotoPath);
-            }
-        }
-
-        // Оновлюємо запис в БД
-        await pool.query(
-            'UPDATE inventory SET photo_filename = $1 WHERE id = $2',
-            [req.file.filename, id]
-        );
-
-        res.status(200).json({ message: 'Photo updated successfully' });
-    } catch (error) {
-        console.error('💥 Error updating photo:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -569,6 +552,72 @@ app.put('/inventory/:id', async (req, res) => {
         });
     } catch (error) {
         console.error('💥 Error updating item:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+/**
+ * @swagger
+ * /inventory/{id}/photo:
+ *   put:
+ *     summary: Оновити фото зображення конкретної речі
+ *     tags: [Inventory]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID інвентаря
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               photo:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Фото оновлено
+ *       404:
+ *         description: Інвентар не знайдено
+ */
+app.put('/inventory/:id/photo', upload.single('photo'), async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+
+        // Перевіряємо існування елемента
+        const checkResult = await pool.query('SELECT * FROM inventory WHERE id = $1', [id]);
+        if (checkResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Item not found' });
+        }
+
+        const item = checkResult.rows[0];
+
+        if (!req.file) {
+            return res.status(400).json({ error: 'Photo is required' });
+        }
+
+        // Видаляємо старе фото якщо воно існує
+        if (item.photo_filename) {
+            const oldPhotoPath = path.join(options.cache, item.photo_filename);
+            if (fs.existsSync(oldPhotoPath)) {
+                fs.unlinkSync(oldPhotoPath);
+            }
+        }
+
+        // Оновлюємо запис в БД
+        await pool.query(
+            'UPDATE inventory SET photo_filename = $1 WHERE id = $2',
+            [req.file.filename, id]
+        );
+
+        res.status(200).json({ message: 'Photo updated successfully' });
+    } catch (error) {
+        console.error('💥 Error updating photo:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
